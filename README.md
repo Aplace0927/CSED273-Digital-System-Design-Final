@@ -1,7 +1,6 @@
 ﻿# CSED273_Final_Proj
+#### Implementing CORDIC Algorithm to calculate sine and cosine
 ---
-Implementing CORDIC Algorithm to calculate sine and cosine
-
 ## Progress
 - [x] Implement basic operations ( <<, x10, +(-), &)
 
@@ -10,3 +9,6 @@ Implementing CORDIC Algorithm to calculate sine and cosine
 - [ ] Implement CORDIC algorithm to `cordic.v` file
 
 - [ ] Implement testbench of CORDIC algorithm 
+
+## Others
+* (Jun 01) Multiplication algorithm debugged
