@@ -1,12 +1,10 @@
-`timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Engineer: Aplace
 // 
 // Create Date: 05/30/2023 10:09:40 PM
-// Design Name: 
+// Design Name: Trigonometric Calculator
 // Module Name: CORDIC
-// Project Name: 
+// Project Name: CSED273_Final
 // Target Devices: 
 // Tool Versions: 
 // Description: 
@@ -24,23 +22,23 @@ module CORDIC(input [31:0] rad,output [31:0] trig);
     wire [31:0] Theta [0:7];
     wire [31:0] Prd_K [0:7];
     
-    assign Theta[0] = 32'b01100100100001111110110101010001;
-    assign Theta[1] = 32'b00111011010110001100111000001010;
-    assign Theta[2] = 32'b00011111010110110111010111111001;
-    assign Theta[3] = 32'b00001111111010101101110101001101;
-    assign Theta[4] = 32'b00000111111111010101011011101101;
-    assign Theta[5] = 32'b00000011111111111010101010110111;
-    assign Theta[6] = 32'b00000001111111111111010101010101;
-    assign Theta[7] = 32'b00000000111111111111111010101010;
+    assign Theta[0] = 32'b11001001000011111101101010100010;
+    assign Theta[1] = 32'b01110110101100011001110000010101;
+    assign Theta[2] = 32'b00111110101101101110101111110010;
+    assign Theta[3] = 32'b00011111110101011011101010011010;
+    assign Theta[4] = 32'b00001111111110101010110111011011;
+    assign Theta[5] = 32'b00000111111111110101010101101110;
+    assign Theta[6] = 32'b00000011111111111110101010101011;
+    assign Theta[7] = 32'b00000001111111111111110101010101;
     
-    assign Prd_K[0] = 32'b01011010100000100111100110011001;
-    assign Prd_K[1] = 32'b01010000111101000100110110001001;
-    assign Prd_K[2] = 32'b01001110100010011000011011101001;
-    assign Prd_K[3] = 32'b01001101111011100100010100000111;
-    assign Prd_K[4] = 32'b01001101110001110110101100000110;
-    assign Prd_K[5] = 32'b01001101101111011011001111101010;
-    assign Prd_K[6] = 32'b01001101101110110100011000011010;
-    assign Prd_K[7] = 32'b01001101101110101010101010100101;
+    assign Prd_K[0] = 32'b10110101000001001111001100110011;
+    assign Prd_K[1] = 32'b10100001111010001001101100010011;
+    assign Prd_K[2] = 32'b10011101000100110000110111010011;
+    assign Prd_K[3] = 32'b10011011110111001000101000001111;
+    assign Prd_K[4] = 32'b10011011100011101101011000001100;
+    assign Prd_K[5] = 32'b10011011011110110110011111010100;
+    assign Prd_K[6] = 32'b10011011011101101000110000110100;
+    assign Prd_K[7] = 32'b10011011011101010101010101001011;
 endmodule
 
 module edge_trigger_JKFF(input reset_n, input j, input k, input clk, output reg q, output reg q_);  
@@ -103,36 +101,38 @@ module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     wire [31:0] r_ofpR;
 
     wire [31:0] OPR_L [0:31];
-    wire [31:0] OPR_R [0:31];    
+    wire [31:0] OPR_R [0:30];    
 
     generate
         genvar t;
         for(t = 0; t <= 31; t = t + 1) begin
             assign r_ifpA[t] = ifpA[31 - t];
             assign r_ifpB[t] = ifpB[31 - t];
-            assign r_ofpR[t] = ofpR[31 - t];
+            assign ofpR[31 - t] = r_ofpR[t];
         end
     endgenerate
     
-    Fixed32_AND FxANDInit(.ifpA(r_ifpA[31:0]),  .iB(r_ifpB[0]), .ofpR({OPR_L[0][31:1], r_ofpR[0]}));
+    assign r_ofpR[0] = OPR_L[0][0];
+    
+    Fixed32_AND FxANDInit(.ifpA(r_ifpA[31:0]),  .iB(r_ifpB[0]), .ofpR(OPR_L[0][31:0]));
     generate
         genvar i;
         for (i = 1; i <= 31; i = i + 1) begin
             Fixed32_AND FxAND(
                 .ifpA(r_ifpA[31:0]),
                 .iB(r_ifpB[i]),
-                .ofpR(OPR_R[i][31:0])
+                .ofpR(OPR_R[i-1][31:0])
             );
         end
     endgenerate
 
-    Fixed32_ADD FxADDInit(.ifpA({1'b0, OPR_L[0][31:1]}), .ifpB(OPR_R[1][31:0]), .iC(1'b0), .oC(OPR_L[1][31]), .ofpR({OPR_L[1][30:0], r_ofpR[1]}));
+    Fixed32_ADD FxADDInit(.ifpA({1'b0, OPR_L[0][31:1]}), .ifpB(OPR_R[0][31:0]), .iC(1'b0), .oC(OPR_L[1][31]), .ofpR({OPR_L[1][30:0], r_ofpR[1]}));
     generate
         genvar j;
-        for (j = 0; j <= 30; j = j + 1) begin
+        for (j = 1; j <= 30; j = j + 1) begin
             Fixed32_ADD FA(
                 .ifpA(OPR_L[j][31:0]),
-                .ifpB(OPR_R[j+1][31:0]),
+                .ifpB(OPR_R[j][31:0]),
                 .iC(1'b0),
                 .oC(OPR_L[j+1][31]),
                 .ofpR({OPR_L[j+1][30:0], r_ofpR[j+1]})
