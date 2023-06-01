@@ -73,6 +73,15 @@ module Fixed32_XOR(input [31:0] ifpA, input iB, output [31:0] ofpR);
     endgenerate
 endmodule
 
+module ConvertConv(input [31:0] ifpA, output [31:0] ofpR);
+    generate
+        genvar v;
+        for(v = 0; v <= 30; v = v + 1) begin
+            assign ofpR[v] = ifpA[31] ^ ifpA[v];
+        end
+    endgenerate
+    assign ofpR[31] = ifpA[31];
+endmodule
 
 module Fixed32_AND(input [31:0] ifpA, input iB, output [31:0] ofpR);
     generate
@@ -101,7 +110,7 @@ module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
 endmodule
 
 
-
+// Error fix.. Required
 module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     wire [30:0] r_ifpA;
     wire [30:0] r_ifpB;
@@ -152,33 +161,32 @@ module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     Fixed32_ADD FxADDFin(.ifpA({1'b0, OPR_SUM[0]}), .ifpB({1'b0, OPR_SFT[0]}), .iC(OPR_C[0]), .oC(_overflow), .ofpR({_tmp, r_ofpR}));
 endmodule
 
-module CORDIC(input reg [31:0] rad, output reg [31:0] trig);
+module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, output [31:0] trig);
     reg [31:0] Theta [0:7];
     reg [31:0] Prd_K [0:7];
 
     reg reset_n;
-    reg clock;
     wire sgn;
 
-    wire [31:0] Din_X;
-    wire [31:0] Din_Y;
-    wire [31:0] Dout_X;
-    wire [31:0] Dout_Y;
+    wire [31:0] Rin [0:8];
+
+    wire [31:0] COS [0:8];
+    wire [31:0] SIN [0:8];
 
     wire [31:0] MulX [0:7];
     wire [31:0] SgnX [0:7];
+    wire [31:0] _NrmX [0:7];
     wire [31:0] NrmX [0:7];
 
     wire [31:0] MulY [0:7];
     wire [31:0] SgnY [0:7];
+    wire [31:0] _NrmY [0:7];
     wire [31:0] NrmY [0:7];
 
     wire [31:0] SgnR [0:7];
 
-    reg [31:0] Rotate [0:1];
-
-    REG32 RX(reset_n, Din_X, clock, Dout_X);
-    REG32 RY(reset_n, Din_Y, clock, Dout_Y);
+    //REG32 RX(reset_n, Din_X, clock, Dout_X);
+    //REG32 RY(reset_n, Din_Y, clock, Dout_Y);
 
     /* Plans and pseudocodes
 
@@ -191,20 +199,20 @@ module CORDIC(input reg [31:0] rad, output reg [31:0] trig);
 
     */
 
+    assign COS[0] = InitVectX[31:0]; //32'b01000000000000000000000000000000;
+    assign SIN[0] = InitVectY[31:0]; //32'b00000000000000000000000000000000;
+
+    assign trig[31:0] = COS[8][31:0];
+
     initial begin
-        clock = 1'b0;
-
-        Rotate[0] = 32'b01111111111111111111111111;
-        Rotate[1] = 32'b00000000000000000000000000;
-
-        Theta[0] = 32'b01100100100001111110110101010001;
-        Theta[1] = 32'b00111011010110001100111000001010;
-        Theta[2] = 32'b00011111010110110111010111111001;
-        Theta[3] = 32'b00001111111010101101110101001101;
-        Theta[4] = 32'b00000111111111010101011011101101;
-        Theta[5] = 32'b00000011111111111010101010110111;
-        Theta[6] = 32'b00000001111111111111010101010101;
-        Theta[7] = 32'b00000000111111111111111010101010;
+        Theta[0] = 32'b00110010010000111111011010101000;
+        Theta[1] = 32'b00011101101011000110011100000101;
+        Theta[2] = 32'b00001111101011011011101011111100;
+        Theta[3] = 32'b00000111111101010110111010100110;
+        Theta[4] = 32'b00000011111111101010101101110110;
+        Theta[5] = 32'b00000001111111111101010101011011;
+        Theta[6] = 32'b00000000111111111111101010101010;
+        Theta[7] = 32'b00000000011111111111111101010101;
         
         /* Accumulated
         Prd_K[0] = 32'b01011010100000100111100110011001;
@@ -217,43 +225,44 @@ module CORDIC(input reg [31:0] rad, output reg [31:0] trig);
         Prd_K[7] = 32'b01001101101110101010101010100101;
         */
         
-        Prd_K[0] = 32'b01011010100000100111100110011001;
-        Prd_K[1] = 32'b01110010011111001001011100010110;
-        Prd_K[2] = 32'b01111100001011011010000100100011;
-        Prd_K[3] = 32'b01111111000000101111011000100010;
-        Prd_K[4] = 32'b01111111110000000010111111011000;
-        Prd_K[5] = 32'b01111111111100000000001011111111;
-        Prd_K[6] = 32'b01111111111111000000000000101111;
-        Prd_K[7] = 32'b01111111111111110000000000000010;
+        Prd_K[0] = 32'b00101101010000010011110011001100;
+        Prd_K[1] = 32'b00111001001111100100101110001011;
+        Prd_K[2] = 32'b00111110000101101101000010010001;
+        Prd_K[3] = 32'b00111111100000010111101100010001;
+        Prd_K[4] = 32'b00111111111000000001011111101100;
+        Prd_K[5] = 32'b00111111111110000000000101111111;
+        Prd_K[6] = 32'b00111111111111100000000000010111;
+        Prd_K[7] = 32'b00111111111111111000000000000001;
     end
+
+    assign Rin[0][31:0] = rad[31:0];
 
     generate
         genvar k;
         for(k = 0; k < 8; k = k + 1) begin
-            assign sgn = rad[31];
 
             // x = v[0] - sigma * (v[1] * 2^-j)
-            Fixed32_MUL angX(Dout_Y, {32'b01000000000000000000000000000000 >> k}, MulX[k]);
-            Fixed32_XOR sgnX(MulX[k], ~sgn, SgnX[k]);
-            Fixed32_ADD cosT(Dout_X, SgnX[k] , ~sgn, _tmp, NrmX[k]);
+            Fixed32_MUL angX(SIN[k], {32'b01000000000000000000000000000000 >> k}, MulX[k]);
+            Fixed32_XOR sgnX(MulX[k], ~Rin[k][31], SgnX[k]);
+            Fixed32_ADD cosT(COS[k], SgnX[k] , ~Rin[k][31], _tmp, _NrmX[k]);
+            ConvertConv cnvX(_NrmX[k], NrmX[k]);
                 
             // y = sigma * (v[0] * 2^(-j)) + v[1];
-            Fixed32_MUL angY(Dout_X, {32'b01000000000000000000000000000000 >> k}, MulY[k]);
-            Fixed32_XOR sgnY(MulY[k], sgn, SgnY[k]);
-            Fixed32_ADD sinT(Dout_Y, SgnY[k] , sgn, _tmp, NrmY[k]);
+            Fixed32_MUL angY(COS[k], {32'b01000000000000000000000000000000 >> k}, MulY[k]);
+            Fixed32_XOR sgnY(MulY[k], Rin[k][31], SgnY[k]);
+            Fixed32_ADD sinT(SIN[k], SgnY[k] , Rin[k][31], _tmp, _NrmY[k]);
+            ConvertConv cnvY(_NrmY[k], NrmY[k]);
 
             // Angle reducing
-            Fixed32_XOR sgnR(Theta[k], ~sgn, SgnR[k]);
-            Fixed32_ADD addR(rad, SgnR[k], ~sgn, _tmp, rad);
+            Fixed32_XOR sgnR(Theta[k], ~Rin[k][31], SgnR[k]);
+            Fixed32_ADD addR(Rin[k], SgnR[k], ~Rin[k][31], _tmp, Rin[k+1]);
                 
             // Normalization
-            Fixed32_MUL nrmX(NrmX[k], Prd_K[k], Din_X);
-            Fixed32_MUL nrmY(NrmY[k], Prd_K[k], Din_Y);
-        end
-    endgenerate
+            Fixed32_MUL nrmX(NrmX[k], Prd_K[k], COS[k+1]);
+            Fixed32_MUL nrmY(NrmY[k], Prd_K[k], SIN[k+1]);
 
-    always begin
-        #10 clock = ~clock;
-    end
+            // Matrix
+        end
+    endgenerate 
 
 endmodule
