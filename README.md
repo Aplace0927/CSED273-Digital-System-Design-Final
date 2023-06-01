@@ -19,4 +19,5 @@
 > `S0123456789012345678901234567890`
 >
 > MSB S [31] is a sign bit: 0 is positive and 1 is negative
+> 
 > From MSB to LSB (in order [30:0]): Each  $i$-th bit represents $2^{-(30-i)}$ is included or not.
