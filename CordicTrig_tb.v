@@ -36,7 +36,7 @@ module CordicTrig_tb();
         #100 $finish;
     end
     
-    //always begin
-    //   #5 BA <= (BA >> 1);
-    //end 
+    always begin
+      #5 BA <= (BA >> 1);
+    end 
 endmodule

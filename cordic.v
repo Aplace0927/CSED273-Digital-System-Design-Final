@@ -110,29 +110,32 @@ module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
 endmodule
 
 
-// Error fix.. Required
 module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
-    wire [30:0] r_ifpA;
-    wire [30:0] r_ifpB;
+    wire [30:0] r_ifpA; // Reversed 31bit input float array of multiplier
+    wire [30:0] r_ifpB; // Reversed 31bit input float array of multiplicant
     
-    wire [30:0] r_ofpR;
+    wire [30:0] r_ofpR; // Reversed 31bit multiplication output (Temp)
+    
+    wire [30:0] OPR_iSFT [0:30];    // Shifted result of (reversed float multiplier) & (digit of multiplicant)
+    wire [30:0] OPR_SFT [0:30];     // Float result of (float multiplier) & (digit of multiplicant) : Reverse of OPR_iSFT
 
-    wire [30:0] OPR_SFT [0:30];
-    wire [30:0] OPR_AND [0:30];
-    wire [30:0] OPR_SUM [0:29];    
+    wire [30:0] OPR_AND [0:30];     // (reversed float multiplier) & (digit of multiplicant)
+    wire [30:0] OPR_SUM [0:29];     // Accumulate of OPR_SFT
     wire OPR_C[0:29];
     
     assign ofpR[31] = ifpA[31] ^ ifpB[31];
     
+    // Reverse wire setting
     generate
         genvar t;
         for(t = 0; t <= 30; t = t + 1) begin
             assign r_ifpA[t] = ifpA[30 - t];
             assign r_ifpB[t] = ifpB[30 - t];
-            assign ofpR[30 - t] = r_ofpR[t];
+            assign ofpR[t] = r_ofpR[t];
         end
     endgenerate
     
+    // AND operations of inversed multiplier and inversed multiplicand: MULTIPLICATE PROPAGATES TO LSB. (2^-1 * 2^-3 = 2^-4)
     generate
         genvar i;
         for (i = 0; i <= 30; i = i + 1) begin
@@ -141,10 +144,21 @@ module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
                 .iB(r_ifpB[i]),
                 .ofpR({_tmp, OPR_AND[i]})
             );
-            assign OPR_SFT[i] = OPR_AND[i] << i;
+            assign OPR_iSFT[i] = OPR_AND[i] << i;
         end
     endgenerate
 
+    // Reverses each 31bit floats
+    generate
+        genvar ki, kj;
+        for (ki = 0; ki <= 30; ki = ki + 1) begin
+            for(kj = 0; kj <= 30; kj = kj + 1) begin
+                assign OPR_SFT[ki][kj] = OPR_iSFT[ki][30 - kj];
+            end
+        end
+    endgenerate
+        
+    // Adding 31bit floats (orignal order): ADDITION CARRY PROPAGATES TO MSB (2^-2 + 2^-2 = 2^-1)
     Fixed32_ADD FxADDInit(.ifpA({1'b0, OPR_SFT[30]}), .ifpB({1'b0, OPR_SFT[29]}), .iC(1'b0), .oC(OPR_C[29]), .ofpR({_tmp, OPR_SUM[29]}));
     generate
         genvar j;
@@ -188,23 +202,15 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
     //REG32 RX(reset_n, Din_X, clock, Dout_X);
     //REG32 RY(reset_n, Din_Y, clock, Dout_Y);
 
-    /* Plans and pseudocodes
-
-    Fixed32_ADD (rad, {rad[31], Theta[30:0]}, rad[31], _oC, rad);
-    
-    // Rad += {rad[31], Theta[30:0]} or Rad -= {rad[31], Theta[30:0]} : determined by rad[31]'s sign
-    // In-carry rad[31] determines ADD or SUB.
-    // Out-carry _oC is not important
-    // Finally rad is calculated and saved to itself again.
-
-    */
-
+    // Initial vector to be rotated
     assign COS[0] = InitVectX[31:0]; //32'b01000000000000000000000000000000;
     assign SIN[0] = InitVectY[31:0]; //32'b00000000000000000000000000000000;
 
+    // Result after 8 iterations.
     assign trig[31:0] = COS[8][31:0];
 
     initial begin
+        // Each atan(2^-i) angle (in rad)
         Theta[0] = 32'b00110010010000111111011010101000;
         Theta[1] = 32'b00011101101011000110011100000101;
         Theta[2] = 32'b00001111101011011011101011111100;
@@ -225,6 +231,7 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
         Prd_K[7] = 32'b01001101101110101010101010100101;
         */
         
+        // Multiplicates with Each iteration
         Prd_K[0] = 32'b00101101010000010011110011001100;
         Prd_K[1] = 32'b00111001001111100100101110001011;
         Prd_K[2] = 32'b00111110000101101101000010010001;
@@ -241,13 +248,13 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
         genvar k;
         for(k = 0; k < 8; k = k + 1) begin
 
-            // x = v[0] - sigma * (v[1] * 2^-j)
+            // x' = x - sigma * (y * 2^-j)
             Fixed32_MUL angX(SIN[k], {32'b01000000000000000000000000000000 >> k}, MulX[k]);
             Fixed32_XOR sgnX(MulX[k], ~Rin[k][31], SgnX[k]);
             Fixed32_ADD cosT(COS[k], SgnX[k] , ~Rin[k][31], _tmp, _NrmX[k]);
             ConvertConv cnvX(_NrmX[k], NrmX[k]);
                 
-            // y = sigma * (v[0] * 2^(-j)) + v[1];
+            // y' = y + sigma * (x * 2^(-j)
             Fixed32_MUL angY(COS[k], {32'b01000000000000000000000000000000 >> k}, MulY[k]);
             Fixed32_XOR sgnY(MulY[k], Rin[k][31], SgnY[k]);
             Fixed32_ADD sinT(SIN[k], SgnY[k] , Rin[k][31], _tmp, _NrmY[k]);
