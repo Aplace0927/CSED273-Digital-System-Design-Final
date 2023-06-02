@@ -8,7 +8,7 @@
 
 - [x] Implement CORDIC algorithm to `cordic.v` file
 
-- [ ] Implement testbench of CORDIC algorithm 
+- [x] Implement testbench of CORDIC algorithm 
 
 ## Others
 * (Jun 01) Multiplication algorithm debugged.
