@@ -18,6 +18,7 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+/*
 module JK_FF(input reset_n, input j, input k, input clk, output reg q, output reg q_);  
     initial begin
       q = 0;
@@ -44,7 +45,7 @@ module REG32(input reset_n, input [31:0] d, input clk, output [31:0] q);
         .q(q[31:0])
     );
 endmodule
-
+*/
 
 module FA(input iA, input iB, input iC, output oC, output oV);
     assign oV = (iA ^ iB ^ iC);
@@ -92,12 +93,11 @@ module Fixed32_AND(input [31:0] ifpA, input iB, output [31:0] ofpR);
     endgenerate
 endmodule
 
-
 module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
     wire [31:0] Shift4;
     wire [31:0] Shift5;
 
-    // 4x == x << 2
+    // 4x = x << 2
     assign Shift4[31:2] = ifpA[29:0];
     assign Shift4[1:0] = 2'b00;
 
@@ -109,6 +109,22 @@ module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
     assign ofpR[0] = 1'b0;
 endmodule
 
+module Fixed32_APRX_4DIG(input [31:0] ifpA, output [31:0] ofpR);
+    wire [30:0] SHFT10 [0:4];
+
+    assign ofpR[31] = ifpA[31];
+
+    assign SHFT10[0][30:0] = ifpA[30:0];
+    assign ofpR[30:0] = {17'b0, SHFT10[4][26:13]};
+
+    generate
+        genvar t;
+        for(t = 0; t < 4; t = t + 1) begin
+            Fixed32_SFT10 SFT({1'b0, SHFT10[t]}, {_tmp, SHFT10[t+1]});
+            // Extract every single 1's digit of number with iteration.
+        end
+    endgenerate
+endmodule
 
 module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     wire [30:0] r_ifpA; // Reversed 31bit input float array of multiplier
@@ -247,7 +263,6 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
     generate
         genvar k;
         for(k = 0; k < 8; k = k + 1) begin
-
             // x' = x - sigma * (y * 2^-j)
             Fixed32_MUL angX(SIN[k], {32'b01000000000000000000000000000000 >> k}, MulX[k]);
             Fixed32_XOR sgnX(MulX[k], ~Rin[k][31], SgnX[k]);
@@ -268,7 +283,6 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
             Fixed32_MUL nrmX(NrmX[k], Prd_K[k], COS[k+1]);
             Fixed32_MUL nrmY(NrmY[k], Prd_K[k], SIN[k+1]);
 
-            // Matrix
         end
     endgenerate 
 
