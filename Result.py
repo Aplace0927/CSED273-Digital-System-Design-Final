@@ -33,11 +33,9 @@ Res = ["4113e40d", "3fc62f95", "3efdd378", "3deb1faf", "3bf9af70", "3a0cb3cf",
        "3746f059", "34a1aa40", "30ff8b6a", "2cee0939", "292c2825", "2469ca3f",
 	   "204180b0", "1af2e89d", "16565ef2", "10308cab", "0b511803", "055f29a5"]
 
-#for ang, cos, res in zip(Ang, Cos, list(map(Fixed32_to_Flt, Res))):
-#	print(f"Angle = {ang:2d} deg | Cosine = {cos:.12f} | CORDIC = {res:.12f} | ERROR = {(abs(cos-res)/cos)*100.0:3.2f} %")
+for ang, cos, res in zip(Ang, Cos, list(map(Fixed32_to_Flt, Res))):
+	print(f"Angle = {ang:2d} deg | Cosine = {cos:.12f} | CORDIC = {res:.12f} | ERROR = {(abs(cos-res)/cos)*100.0:3.2f} %")
 
-for i in range(15, 90, 15):
-	print(Flt_to_Fixed32(math.radians(i)))
 # Angle =  0 deg | Cosine = 1.000000000000 | CORDIC = 1.016839039512 | ERROR = 1.68 %                     
 # Angle =  5 deg | Cosine = 0.996194698092 | CORDIC = 0.996471305378 | ERROR = 0.03 %
 # Angle = 10 deg | Cosine = 0.984807753012 | CORDIC = 0.984242312610 | ERROR = 0.06 %
