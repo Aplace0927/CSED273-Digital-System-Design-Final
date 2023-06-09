@@ -18,35 +18,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-/*
-module JK_FF(input reset_n, input j, input k, input clk, output reg q, output reg q_);  
-    initial begin
-      q = 0;
-      q_ = ~q;
-    end
-    
-    always @(negedge clk) begin
-        q = reset_n & (j&~q | ~k&q);
-        q_ = ~reset_n | ~q;
-    end
-endmodule
-
-
-module D_FF(input reset_n, input d, input clk, output q);   
-    JK_FF D(reset_n, d, ~d, clk, q, _);
-endmodule
-
-
-module REG32(input reset_n, input [31:0] d, input clk, output [31:0] q);
-    D_FF DFF32 [31:0](
-        .reset_n(reset_n),
-        .d(d[31:0]),
-        .clk(clk),
-        .q(q[31:0])
-    );
-endmodule
-*/
-
 module FA(input iA, input iB, input iC, output oC, output oV);
     assign oV = (iA ^ iB ^ iC);
     assign oC = (((iA ^ iB) & iC) | (iA & iB));
@@ -64,7 +35,7 @@ module Fixed32_ADD(input [31:0] ifpA, input [31:0] ifpB, input iC, output oC, ou
     );
 endmodule
 
-
+// XOR (vector) to (bit)
 module Fixed32_XOR(input [31:0] ifpA, input iB, output [31:0] ofpR);
     generate
         genvar i;
@@ -74,6 +45,12 @@ module Fixed32_XOR(input [31:0] ifpA, input iB, output [31:0] ofpR);
     endgenerate
 endmodule
 
+/*
+*   There are two ways to represent negative value in this project.
+*   In Fixed-point, MSB 1 bit is sign bit, and other 31 bits are magnitude.
+*   In Integer, Represents negative number with 2's complement.
+*   This function converts numbers between these conventions
+*/
 module ConvertConv(input [31:0] ifpA, output [31:0] ofpR);
     generate
         genvar v;
@@ -84,6 +61,7 @@ module ConvertConv(input [31:0] ifpA, output [31:0] ofpR);
     assign ofpR[31] = ifpA[31];
 endmodule
 
+// AND (vector) to (bit)
 module Fixed32_AND(input [31:0] ifpA, input iB, output [31:0] ofpR);
     generate
         genvar i;
@@ -93,6 +71,7 @@ module Fixed32_AND(input [31:0] ifpA, input iB, output [31:0] ofpR);
     endgenerate
 endmodule
 
+// Multiplies number 10 time w/ Bitshift operations
 module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
     wire [31:0] Shift4;
     wire [31:0] Shift5;
@@ -109,23 +88,25 @@ module Fixed32_SFT10(input [31:0] ifpA, output [31:0] ofpR);
     assign ofpR[0] = 1'b0;
 endmodule
 
+// Parse 4 digit of decimal number from calulated output
 module Fixed32_APRX_4DIG(input [31:0] ifpA, output [31:0] ofpR);
     wire [30:0] SHFT10 [0:4];
 
     assign ofpR[31] = ifpA[31];
 
     assign SHFT10[0][30:0] = ifpA[30:0];
-    assign ofpR[30:0] = {17'b0, SHFT10[4][26:13]};
+    assign ofpR[30:0] = {17'b0, SHFT10[4][26:13]};  // Set lower 14bit (2^14 > 10000 > 2^13) to fixed point
 
     generate
         genvar t;
-        for(t = 0; t < 4; t = t + 1) begin
+        for(t = 0; t < 4; t = t + 1) begin  // Shift10 * 4 times -> 10000 times
             Fixed32_SFT10 SFT({1'b0, SHFT10[t]}, {_tmp, SHFT10[t+1]});
             // Extract every single 1's digit of number with iteration.
         end
     endgenerate
 endmodule
 
+// Multiply (Fixed 32bit) and (Fixed 32bit)
 module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     wire [30:0] r_ifpA; // Reversed 31bit input float array of multiplier
     wire [30:0] r_ifpB; // Reversed 31bit input float array of multiplicant
@@ -191,40 +172,48 @@ module Fixed32_MUL(input [31:0] ifpA, input [31:0] ifpB, output [31:0] ofpR);
     Fixed32_ADD FxADDFin(.ifpA({1'b0, OPR_SUM[0]}), .ifpB({1'b0, OPR_SFT[0]}), .iC(OPR_C[0]), .oC(_overflow), .ofpR({_tmp, r_ofpR}));
 endmodule
 
-module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, output [31:0] trig);
+// Main CORDIC driving code.
+module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, output [255:0] trig);
     reg [31:0] Theta [0:7];
     reg [31:0] Prd_K [0:7];
 
-    reg reset_n;
     wire sgn;
 
-    wire [31:0] Rin [0:8];
+    wire [31:0] Rin [0:8];      // Each iteration's remaining angle
 
-    wire [31:0] COS [0:8];
-    wire [31:0] SIN [0:8];
+    wire [31:0] COS [0:8];      // Each iteration's cosine value
+    wire [31:0] SIN [0:8];      // Each iteration's sine value
 
-    wire [31:0] MulX [0:7];
-    wire [31:0] SgnX [0:7];
-    wire [31:0] _NrmX [0:7];
-    wire [31:0] NrmX [0:7];
+    wire [31:0] MulX [0:7];     // Multiplicant to X value
+    wire [31:0] SgnX [0:7];     // Multiplicant to X value w/ sign
+    wire [31:0] _NrmX [0:7];    // X value before normalize
+    wire [31:0] NrmX [0:7];     // X value after normalize
 
-    wire [31:0] MulY [0:7];
-    wire [31:0] SgnY [0:7];
-    wire [31:0] _NrmY [0:7];
-    wire [31:0] NrmY [0:7];
+    wire [31:0] MulY [0:7];     // Multiplicant to Y value
+    wire [31:0] SgnY [0:7];     // Multiplicant to Y value w/ sign
+    wire [31:0] _NrmY [0:7];    // Y value before normalize
+    wire [31:0] NrmY [0:7];     // Y value after normalize
 
-    wire [31:0] SgnR [0:7];
+    wire [31:0] SgnR [0:7];     
 
     //REG32 RX(reset_n, Din_X, clock, Dout_X);
     //REG32 RY(reset_n, Din_Y, clock, Dout_Y);
 
-    // Initial vector to be rotated
+    // Initial vector to be rotated.
     assign COS[0] = InitVectX[31:0]; //32'b01000000000000000000000000000000;
     assign SIN[0] = InitVectY[31:0]; //32'b00000000000000000000000000000000;
 
-    // Result after 8 iterations.
-    assign trig[31:0] = COS[8][31:0];
+    // Result for every teration.
+    assign trig[ 31:  0] = COS[1][31:0];
+    assign trig[ 63: 32] = COS[2][31:0];
+    assign trig[ 95: 64] = COS[3][31:0];
+    assign trig[127: 96] = COS[4][31:0];
+    assign trig[159:128] = COS[5][31:0];
+    assign trig[191:160] = COS[6][31:0];
+    assign trig[223:192] = COS[7][31:0];
+    assign trig[255:224] = COS[8][31:0];
 
+    // Lookup table initialization
     initial begin
         // Each atan(2^-i) angle (in rad)
         Theta[0] = 32'b00110010010000111111011010101000;
@@ -242,7 +231,7 @@ module CORDIC(input [31:0] rad, input [31:0] InitVectX, input [31:0] InitVectY, 
         Prd_K[2] = 32'b01001110100010011000011011101001;
         Prd_K[3] = 32'b01001101111011100100010100000111;
         Prd_K[4] = 32'b01001101110001110110101100000110;
-        Prd_K[5] = 32'b01001101101111011011001111101010;
+        Prd_K[5] = 32'b01001101101111011011001111z101010;
         Prd_K[6] = 32'b01001101101110110100011000011010;
         Prd_K[7] = 32'b01001101101110101010101010100101;
         */

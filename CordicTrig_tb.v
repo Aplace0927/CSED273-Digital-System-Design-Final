@@ -19,20 +19,26 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module CordicTrig_tb();
-    integer i;
+    reg clk;
+    reg reset_n;
 
     reg [31:0] BA;
-    wire [31:0] ResultC;
+    wire [255:0] ResultC;
     wire [31:0] ResultD;
-    // Initialize with (Input angle), (vector [1, 0]), (Output wire)
+    
     CORDIC CRD(BA, 32'b01000000000000000000000000000000, 32'b00000000000000000000000000000000 , ResultC);
-    Fixed32_APRX_4DIG SHFT({18'b0, ResultC[30:17]}, ResultD);
+    Fixed32_APRX_4DIG SHFT({18'b0, ResultC[30+224:17+224]}, ResultD);
+    Count8 Cnt(reset_n, clk, Counts);
 
     initial begin    
-        BA[31:0] <= 32'h00000000; // Initialize by 0 [deg]
-        for(i = 0; i < 90; i = i + 5) begin
-        	#5 BA <= BA + 32'h0595c612; // Increment by 5 [deg]
-        	$display("Now angle: %d | Cosine value = %d", i, ResultD);
-        end
+        BA[31:0] <= 32'hdeadbeef;
+        reset_n = 1;
+        clk = 0;
+        #5 reset_n = 0;
+        #5 reset_n = 1;
+    end
+
+    always begin
+        #5 clk = !clk;
     end
 endmodule
