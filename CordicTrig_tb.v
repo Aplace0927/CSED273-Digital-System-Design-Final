@@ -19,26 +19,20 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module CordicTrig_tb();
-    reg clk;
-    reg reset_n;
-
+    integer k;
     reg [31:0] BA;
     wire [255:0] ResultC;
     wire [31:0] ResultD;
     
     CORDIC CRD(BA, 32'b01000000000000000000000000000000, 32'b00000000000000000000000000000000 , ResultC);
     Fixed32_APRX_4DIG SHFT({18'b0, ResultC[30+224:17+224]}, ResultD);
-    Count8 Cnt(reset_n, clk, Counts);
 
-    initial begin    
-        BA[31:0] <= 32'hdeadbeef;
-        reset_n = 1;
-        clk = 0;
-        #5 reset_n = 0;
-        #5 reset_n = 1;
-    end
-
-    always begin
-        #5 clk = !clk;
+    initial begin
+        BA[31:0] = 32'h00000000;
+        for(k = 0; k < 90; k = k + 5) begin
+            $display("Deg = %2d | CORDIC = %5d", k, ResultD);
+            #10 BA = BA + 32'h0595c612;
+        end
+        $finish;
     end
 endmodule
